@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
         bodyPositions.resize(BodyChannels.size());
         
         // set loop count
-        for (i = 0; i < 5000; i++) {
+        for (i = 0; i < 500; i++) {
             
             // use the same routine as when getting channel info
             
