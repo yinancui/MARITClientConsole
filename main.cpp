@@ -260,8 +260,8 @@ int main(int argc, char** argv) {
         std::vector<BodyData> bodyPositions;
         bodyPositions.resize(BodyChannels.size());
         
-        // run for 1000 loops
-        for (i = 0; i < 1000; i++) {
+        // set loop count
+        for (i = 0; i < 5000; i++) {
             
             // use the same routine as when getting channel info
             
@@ -353,7 +353,10 @@ int main(int argc, char** argv) {
                 std::cout << "BodyName: " << iBody->Name        << std::endl
                           << "X: "        << iBodyData->TX      << std::endl
                           << "Y: "        << iBodyData->TY      << std::endl
-                          << "Z: "        << iBodyData->TZ      << std::endl;
+                          << "Z: "        << iBodyData->TZ      << std::endl
+                          << "Roll: "     << data[iBody->RX]    << std::endl
+                          << "Pitch: "    << data[iBody->RY]    << std::endl
+                          << "Yaw: "      << data[iBody->RZ]    << std::endl;
                 
                 
                 /*
