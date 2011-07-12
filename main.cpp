@@ -43,14 +43,14 @@ int sockfd, numbytes;
 struct addrinfo hints, *servinfo, *p;
 char s[INET6_ADDRSTRLEN];
 
-
 void* get_in_addr(struct sockaddr* sa) {
     if (sa->sa_family == AF_INET)
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+        return &(((struct sockaddr_in*) sa)->sin_addr);
+    return &(((struct sockaddr_in6*) sa)->sin6_addr);
 }
 
 // enriched recv method ---------------------------------------------------
+
 bool receive(int Socket, char* pBuffer, int BufferSize) {
     char* p = pBuffer;
     char* e = pBuffer + BufferSize;
@@ -66,15 +66,15 @@ bool receive(int Socket, char* pBuffer, int BufferSize) {
 }
 
 bool receive(int Socket, long int & Val) {
-    return receive(Socket, (char*)& Val, sizeof(Val));
+    return receive(Socket, (char*) & Val, sizeof (Val));
 }
 
 bool receive(int Socket, unsigned long int & Val) {
-    return receive(Socket, (char*)& Val, sizeof(Val));
+    return receive(Socket, (char*) & Val, sizeof (Val));
 }
 
 bool receive(int Socket, double& Val) {
-    return receive(Socket, (char*)& Val, sizeof(Val));
+    return receive(Socket, (char*) & Val, sizeof (Val));
 }
 
 //--------------------------------------------------------------
@@ -84,12 +84,13 @@ int connectServer();
 
 
 ////////////////
+
 int main(int argc, char** argv) {
 
     std::cout << "LinuxClient\n";
     if (connectServer() != 0)
         return 1;
-    
+
     // up to here a connection with Vicon RTE is open
     // now begin receiving and process data
     try {
@@ -97,27 +98,27 @@ int main(int argc, char** argv) {
         const int bufferSize = 2040;
         char buff[bufferSize];
         char* pBuff;
-        
+
         // Get info
         // request channel info
         pBuff = buff;
         // save EInfo into buff thru pBuff
         *((long int*) pBuff) = ClientCodes::EInfo;
         // and move pointer to next available position in buff
-        pBuff += sizeof(long int);
-        
+        pBuff += sizeof (long int);
+
         *((long int*) pBuff) = ClientCodes::ERequest;
-        pBuff += sizeof(long int);
-        
+        pBuff += sizeof (long int);
+
         // check packet header
         // pBuff - buff is an int equal to 2*sizeof(long int) in this case
         // send request to server
         if (send(sockfd, buff, pBuff - buff, 0) == -1)
             throw std::string("Error Requesting");
-        
+
         long int packet;
         long int type;
-        
+
         // recv and pass data to packet
         if (!receive(sockfd, packet))
             throw std::string("Error receiving.\n");
@@ -128,22 +129,22 @@ int main(int argc, char** argv) {
             throw std::string("Bad reply type.\n");
         if (packet != ClientCodes::EInfo)
             throw std::string("Bad packet.\n");
-        
+
         long int size;
-        
+
         // recv and pass data to size, thus get the size of future data?
         if (!receive(sockfd, size))
-            throw std::string("Wrong size.\n");   // ????
-        
+            throw std::string("Wrong size.\n"); // ????
+
         info.resize(size);
-        
+
         std::vector<std::string>::iterator iInfo;
         //info.
         for (iInfo = info.begin(); iInfo != info.end(); iInfo++) {
             long int s;
             char c[255];
             char* p = c;
-            
+
             if (!receive(sockfd, s))
                 throw std::string();
             if (!receive(sockfd, c, s))
@@ -152,8 +153,8 @@ int main(int argc, char** argv) {
             *p = 0;
             *iInfo = std::string(c);
         }
-        
-        
+
+
         //----------------------------
         //--------- Parse info --------
         // the info packets contain channel names.
@@ -161,25 +162,25 @@ int main(int argc, char** argv) {
         std::vector<MarkerChannel> MarkerChannels;
         std::vector<BodyChannel> BodyChannels;
         int FrameChannel;
-        
+
         for (iInfo = info.begin(); iInfo != info.end(); iInfo++) {
             // Extract the channel type
             // looking for the FIRST '<' in each info string
-            
+
             int openBrace = iInfo->find('<');
             // if no '<' found
             if (openBrace == iInfo->npos)
                 throw std::string("Bad channel ID");
-            
+
             int closeBrace = iInfo->find('>');
             if (closeBrace == iInfo->npos)
                 throw std::string("Bad channel ID");
-            
-            closeBrace++;             
+
+            closeBrace++;
             // Type is given the content within the first '<>' of each info
             // which is the channel type
             std::string Type = iInfo->substr(openBrace, closeBrace - openBrace);
-            
+
             // Extract the Name
             // the Name is the substring from the begin to the first '<'
             std::string Name = iInfo->substr(0, openBrace);
@@ -187,92 +188,81 @@ int main(int argc, char** argv) {
             int space = Name.rfind(' ');
             if (space != Name.npos)
                 Name.resize(space);
-            
+
             std::vector<MarkerChannel>::iterator iMarker;
             std::vector<BodyChannel>::iterator iBody;
             std::vector<std::string>::const_iterator iTypes;
-            
+
             iMarker = std::find(MarkerChannels.begin(),
-                                MarkerChannels.end(), 
-                                Name);
+                    MarkerChannels.end(),
+                    Name);
             iBody = std::find(BodyChannels.begin(),
-                              BodyChannels.end(),
-                              Name);
-            
-            if(iMarker != MarkerChannels.end())
-            {
+                    BodyChannels.end(),
+                    Name);
+
+            if (iMarker != MarkerChannels.end()) {
                 //  The channel is for a marker we already have.
-                iTypes = std::find( ClientCodes::MarkerTokens.begin(), ClientCodes::MarkerTokens.end(), Type);
-                if(iTypes != ClientCodes::MarkerTokens.end())
+                iTypes = std::find(ClientCodes::MarkerTokens.begin(), ClientCodes::MarkerTokens.end(), Type);
+                if (iTypes != ClientCodes::MarkerTokens.end())
                     iMarker->operator[](iTypes - ClientCodes::MarkerTokens.begin()) = iInfo - info.begin();
-            }
-            else
-            if(iBody != BodyChannels.end())
-            {
+            } else
+                if (iBody != BodyChannels.end()) {
                 //  The channel is for a body we already have.
                 iTypes = std::find(ClientCodes::BodyTokens.begin(), ClientCodes::BodyTokens.end(), Type);
-                if(iTypes != ClientCodes::BodyTokens.end())
+                if (iTypes != ClientCodes::BodyTokens.end())
                     iBody->operator[](iTypes - ClientCodes::BodyTokens.begin()) = iInfo - info.begin();
-            }
-            else
-            if((iTypes = std::find(ClientCodes::MarkerTokens.begin(), ClientCodes::MarkerTokens.end(), Type))
-                    != ClientCodes::MarkerTokens.end())
-            {
+            } else
+                if ((iTypes = std::find(ClientCodes::MarkerTokens.begin(), ClientCodes::MarkerTokens.end(), Type))
+                    != ClientCodes::MarkerTokens.end()) {
                 //  Its a new marker.
                 MarkerChannels.push_back(MarkerChannel(Name));
                 MarkerChannels.back()[iTypes - ClientCodes::MarkerTokens.begin()] = iInfo - info.begin();
-            }
-            else
-            if((iTypes = std::find(ClientCodes::BodyTokens.begin(), ClientCodes::BodyTokens.end(), Type))
-                    != ClientCodes::BodyTokens.end())
-            {
+            } else
+                if ((iTypes = std::find(ClientCodes::BodyTokens.begin(), ClientCodes::BodyTokens.end(), Type))
+                    != ClientCodes::BodyTokens.end()) {
                 //  Its a new body.
                 BodyChannels.push_back(BodyChannel(Name));
                 BodyChannels.back()[iTypes - ClientCodes::BodyTokens.begin()] = iInfo - info.begin();
-            }
-            else
-            if(Type == "<F>")
-            {
+            } else
+                if (Type == "<F>") {
                 FrameChannel = iInfo - info.begin();
-            }
-            else
-            {
+            } else {
                 //  It could be a new channel type.
             }
-            
+
         }
-        
+
         //------ Up to now all markersnames are in MarkerChannels
         //------ all bodynames are in BodyChannels
-        
-        
+
+
         //----------- Get Data
         // get the data using request/reply protocol.
-        
+
         int i;
         std::vector<double> data;
         data.resize(info.size());
         double timestamp;
-        
+
         std::vector<MarkerData> markerPositions;
         markerPositions.resize(MarkerChannels.size());
-        
+
         std::vector<BodyData> bodyPositions;
         bodyPositions.resize(BodyChannels.size());
-        
+
         // set loop count
-        for (i = 0; i < 500; i++) {
-            
+        for (i = 0; i < 10; i++) {
+
             // use the same routine as when getting channel info
-            
+
             pBuff = buff;
 
             * ((long int *) pBuff) = ClientCodes::EData;
-            pBuff += sizeof(long int);
+            pBuff += sizeof (long int);
             * ((long int *) pBuff) = ClientCodes::ERequest;
-            pBuff += sizeof(long int);
+            pBuff += sizeof (long int);
 
-            if(send(sockfd, buff, pBuff - buff, 0) == -1)
+            if (send(sockfd, buff, pBuff - buff, 0) == -1)
                 throw std::string("Error Requesting");
 
             long int packet;
@@ -280,149 +270,210 @@ int main(int argc, char** argv) {
 
             //  Get and check the packet header.
 
-            if(!receive(sockfd, packet))
+            if (!receive(sockfd, packet))
                 throw std::string("Error Recieving");
 
-            if(!receive(sockfd, type))
+            if (!receive(sockfd, type))
                 throw std::string("Error Recieving");
 
-            if(type != ClientCodes::EReply)
+            if (type != ClientCodes::EReply)
                 throw std::string("Bad Packet");
 
-            if(packet != ClientCodes::EData)
+            if (packet != ClientCodes::EData)
                 throw std::string("Bad Reply Type");
 
-            if(!receive(sockfd, size))
+            if (!receive(sockfd, size))
                 throw std::string();
 
-            if(size != info.size())
+            if (size != info.size())
                 throw std::string("Bad Data Packet");
-            
+
             // Actually getting the data and store in "data"
             std::vector<double>::iterator iData;
             for (iData = data.begin(); iData != data.end(); iData++) {
                 if (!receive(sockfd, *iData))
                     throw std::string();
             }
-            
+
             //- Look up channels -------------
             // get the timestamp
             timestamp = data[FrameChannel];
-            
-           
-            
-          /*
-           * Get channels corresponding to markers
-           * 
-           */
-            
+
+
+
+            /*
+             * Get channels corresponding to markers
+             * 
+             */
+
             std::vector< MarkerChannel >::iterator iMarker;
             std::vector< MarkerData >::iterator iMarkerData;
 
-            for(    iMarker = MarkerChannels.begin(),
+            for (iMarker = MarkerChannels.begin(),
                     iMarkerData = markerPositions.begin();
-                    iMarker != MarkerChannels.end(); iMarker++, iMarkerData++)
-            {
+                    iMarker != MarkerChannels.end(); iMarker++, iMarkerData++) {
                 iMarkerData->X = data[iMarker->X];
                 iMarkerData->Y = data[iMarker->Y];
                 iMarkerData->Y = data[iMarker->Z];
-                if(data[iMarker->O] > 0.5)
+                if (data[iMarker->O] > 0.5)
                     iMarkerData->Visible = false;
                 else
                     iMarkerData->Visible = true;
             }
-            
+
             /* 
              * Get the channels corresponding to bodies
              * the world is Z-up
              * the translational values are in millimeters
              * the rotational values are in radians
              */
-            
+
             std::vector<BodyChannel>::iterator iBody;
             std::vector<BodyData>::iterator iBodyData;
-            
-            for (       iBody = BodyChannels.begin(),
-                        iBodyData = bodyPositions.begin();
-                        iBody != BodyChannels.end(); iBody++, iBodyData++) {
-                
+
+            for (iBody = BodyChannels.begin(),
+                    iBodyData = bodyPositions.begin();
+                    iBody != BodyChannels.end(); iBody++, iBodyData++) {
+
                 iBodyData->TX = data[iBody->TX];
                 iBodyData->TY = data[iBody->TY];
                 iBodyData->TZ = data[iBody->TZ];
-                
-                std::cout << "BodyName: " << iBody->Name        << std::endl
-                          << "X: "        << iBodyData->TX      << std::endl
-                          << "Y: "        << iBodyData->TY      << std::endl
-                          << "Z: "        << iBodyData->TZ      << std::endl
-                          << "Roll: "     << data[iBody->RX]    << std::endl
-                          << "Pitch: "    << data[iBody->RY]    << std::endl
-                          << "Yaw: "      << data[iBody->RZ]    << std::endl;
-                
-                
-                /*
+
+                //                The channel data is in the angle-axis form.
+                //                        The following converts this to a quaternion.
+                //                        =============================================================
+                //                        An angle-axis is vector, the direction of which is the axis
+                //                        of rotation and the length of which is the amount of
+                //                        rotation in radians.
+                //                        =============================================================
+
                 double len, tmp;
-                len = sqrt( data[iBody->RX] * data[iBody->RX] +
-                            data[iBody->RY] * data[iBody->RY] +
-                            data[iBody->RZ] * data[iBody->RZ]);
+
+                len = sqrt(data[iBody->RX] * data[iBody->RX] +
+                        data[iBody->RY] * data[iBody->RY] +
+                        data[iBody->RZ] * data[iBody->RZ]);
 
                 iBodyData->QW = cos(len / 2.0);
                 tmp = sin(len / 2.0);
-                */
-                
-                
-                std::cout << "--------------Frame: " << timestamp << std::endl;
-            }
-            
-            
-            
-            
-            
+                if (len < 1e-10) {
+                    iBodyData->QX = data[iBody->RX];
+                    iBodyData->QY = data[iBody->RY];
+                    iBodyData->QZ = data[iBody->RZ];
+                } else {
+                    iBodyData->QX = data[iBody->RX] * tmp / len;
+                    iBodyData->QY = data[iBody->RY] * tmp / len;
+                    iBodyData->QZ = data[iBody->RZ] * tmp / len;
+                }
 
+                //	The following converts angle-axis to a rotation matrix.
+
+                double c, s, x, y, z;
+
+                if (len < 1e-15) {
+                    iBodyData->GlobalRotation[0][0] = iBodyData->GlobalRotation[1][1] = iBodyData->GlobalRotation[2][2] = 1.0;
+                    iBodyData->GlobalRotation[0][1] = iBodyData->GlobalRotation[0][2] = iBodyData->GlobalRotation[1][0] =
+                            iBodyData->GlobalRotation[1][2] = iBodyData->GlobalRotation[2][0] = iBodyData->GlobalRotation[2][1] = 0.0;
+                } else {
+                    x = data[iBody->RX] / len;
+                    y = data[iBody->RY] / len;
+                    z = data[iBody->RZ] / len;
+
+                    c = cos(len);
+                    s = sin(len);
+
+                    iBodyData->GlobalRotation[0][0] = c + (1 - c) * x*x;
+                    iBodyData->GlobalRotation[0][1] = (1 - c) * x * y + s * (-z);
+                    iBodyData->GlobalRotation[0][2] = (1 - c) * x * z + s*y;
+                    iBodyData->GlobalRotation[1][0] = (1 - c) * y * x + s*z;
+                    iBodyData->GlobalRotation[1][1] = c + (1 - c) * y*y;
+                    iBodyData->GlobalRotation[1][2] = (1 - c) * y * z + s * (-x);
+                    iBodyData->GlobalRotation[2][0] = (1 - c) * z * x + s * (-y);
+                    iBodyData->GlobalRotation[2][1] = (1 - c) * z * y + s*x;
+                    iBodyData->GlobalRotation[2][2] = c + (1 - c) * z*z;
+                }
+
+                // now convert rotation matrix to nasty Euler angles (yuk)
+                // you could convert direct from angle-axis to Euler if you wish
+
+                //	'Look out for angle-flips, Paul...'
+                //  Algorithm: GraphicsGems II - Matrix Techniques VII.1 p 320
+                assert(fabs(iBodyData->GlobalRotation[0][2]) <= 1);
+                iBodyData->EulerY = asin(-iBodyData->GlobalRotation[2][0]);
+
+                if (fabs(cos(y)) >
+                        std::numeric_limits<double>::epsilon()) // cos(y) != 0 Gimbal-Lock
+                {
+                    iBodyData->EulerX = atan2(iBodyData->GlobalRotation[2][1], iBodyData->GlobalRotation[2][2]);
+                    iBodyData->EulerZ = atan2(iBodyData->GlobalRotation[1][0], iBodyData->GlobalRotation[0][0]);
+                } else {
+                    iBodyData->EulerZ = 0;
+                    iBodyData->EulerX = atan2(iBodyData->GlobalRotation[0][1], iBodyData->GlobalRotation[1][1]);
+                }
+
+                std::cout << "BodyName: " << iBody->Name << std::endl
+                        << "X: " << iBodyData->TX << std::endl
+                        << "Y: " << iBodyData->TY << std::endl
+                        << "Z: " << iBodyData->TZ << std::endl;
+
+                std::cout << "Roll: " << iBodyData->EulerX << std::endl
+                        << "Pitch: " << iBodyData->EulerY << std::endl
+                        << "Yaw: " << iBodyData->EulerZ << std::endl;
+
+
+            }
+            std::cout << "--------------Frame: " << timestamp << std::endl;
         }
-        
-        
-        
-        
-        
+
+
+
+
+
+
+
+
+
+
+
+
         //-----------------------------
         //------STOPPED HERE----------
         //----------------------------
-        
-        
-    }
-    catch (const std::string &rMsg) {
+
+
+    }    catch (const std::string &rMsg) {
         if (rMsg.empty())
             std::cout << "Error!\n";
         else
             std::cout << rMsg.c_str() << std::endl;
     }
-    
-    if (close(sockfd) != 0 ) {
+
+    if (close(sockfd) != 0) {
         std::cout << "Failed to close socket.\n";
         return 1;
     }
-    
+
     return 0;
 }
 
 
 
 ///////////
+
 int connectServer() {
-    
+
     memset(&hints, 0, sizeof hints);
-    hints.ai_family     = AF_UNSPEC;
-    hints.ai_socktype   = SOCK_STREAM;
-    
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
     // hard code the server's IP and port 
     if ((getaddrinfo(ServerIP, PORT, &hints, &servinfo)) != 0) {
         std::cout << "Failed to get server info.\n";
         return 1;
     }
-    
+
     for (p = servinfo; p != NULL; p = p->ai_next) {
         // create client's socket
-        if ((sockfd = socket(p->ai_family, p->ai_socktype, 
+        if ((sockfd = socket(p->ai_family, p->ai_socktype,
                 p->ai_protocol)) == -1) {
             std::cout << "Failed to create client socket.\n";
             continue;
@@ -442,13 +493,13 @@ int connectServer() {
         std::cout << "Failed to connect to server.\n";
         return 2;
     }
-    
+
     std::cout << "Connected.\n";
-    
+
     inet_ntop(p->ai_family, get_in_addr((struct sockaddr *) p->ai_addr),
             s, sizeof s);
-    
+
     freeaddrinfo(servinfo);
-    
+
     return 0;
 }
