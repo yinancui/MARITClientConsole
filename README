@@ -1,0 +1,4 @@
+MARIT controller client console
+The client is developed with Vicon Realtime SDK, it receives
+real-time data from Vicon server and generate controller 
+commands.
